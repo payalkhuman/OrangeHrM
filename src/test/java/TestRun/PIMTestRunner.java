@@ -1,0 +1,146 @@
+package TestRun;
+
+
+
+import static org.testng.Assert.assertEquals;
+
+import java.io.IOException;
+
+import org.json.simple.JSONObject;
+import org.openqa.selenium.By;
+import org.openqa.selenium.Keys;
+import org.openqa.selenium.WebElement;
+import org.testng.annotations.Test;
+
+import com.github.javafaker.Faker;
+
+import Project_01.Setup;
+import dev.failsafe.internal.util.Assert;
+import io.cucumber.cienvironment.internal.com.eclipsesource.json.ParseException;
+import io.opentelemetry.api.internal.Utils;
+import pages.DashboardPage;
+import pages.LoginPage;
+import pages.PIMPage;
+
+
+public class PIMTestRunner extends Setup {
+    DashboardPage dashboardPage;
+    LoginPage loginPage;
+    PIMPage pimPage;
+
+    @Test(priority = 1, description = "User cannot login with invalid creds")
+    public void doLoginWithInvalidCreds() throws InterruptedException {
+        loginPage = new LoginPage(driver);
+        String message_actual = loginPage.doLoginWithInvalidCreds("admin", "wrong password");
+        String message_expected = "Invalid credentials";
+        org.testng.Assert.assertTrue(message_actual.contains(message_expected));
+        Thread.sleep(1500);
+
+    }
+    @Test(priority = 2, description = "User can do login with valid Creds")
+    public void doLogin() throws IOException, ParseException, InterruptedException {
+
+        loginPage = new LoginPage(driver);
+        dashboardPage = new DashboardPage(driver);
+        String username, password;
+        JSONObject userObject = Utils.loadJSONFile("./src/test/resources/Admin.json");
+        if (System.getProperty("username") != null && System.getProperty("password") != null) {
+            username = System.getProperty("username");
+            password = System.getProperty("password");
+        } else {
+            username = (String) userObject.get("username");
+            password = (String) userObject.get("password");
+        }
+        loginPage.doLogin(username, password);
+
+        // Assertion
+        WebElement headerText = driver.findElement(By.tagName("h6"));
+        String header_actual = headerText.getText();
+        String header_expected = "Dashboard";
+        assertEquals(header_actual, header_expected);
+        Thread.sleep(1500);
+        dashboardPage.menus.get(1).click();
+        Thread.sleep(1500);
+    }
+
+    
+    
+
+    @Test(priority = 6, description = "Searching With Invalid Employee's Name")
+    public void searchEmployeeByInvalidName() throws InterruptedException {
+        pimPage = new PIMPage(driver);
+        dashboardPage = new DashboardPage(driver);
+        dashboardPage.menus.get(1).click();
+        Faker faker = new Faker();
+        String name = faker.name().firstName();
+        String employeeName = name;
+        pimPage.SearchEmployeeByInvalidName(employeeName);
+        Thread.sleep(1500);
+
+        //Assertion
+        String message_actual = driver.findElements(By.className("oxd-text--span")).get(11).getText();
+        String message_expected = "No Records Found";
+        Assert.assertEquals(message_expected, message_actual);
+        Thread.sleep(1000);
+
+    }
+
+    @Test(priority = 7, description = "Searching with Valid Employee's name")
+    public void searchEmployeeByName() throws IOException, ParseException, InterruptedException {
+        loginPage = new LoginPage(driver);
+        JSONObject userObject = Utils.loadJSONFileContainingArray("./src/test/resources/Employee.json", 0);
+        String employeeFirstName = userObject.get("firstname").toString();
+        String employeeLastName=userObject.get("lastname").toString();
+        String employeeName=employeeFirstName + " " + employeeLastName;
+
+        pimPage.txtSearchEmpName.get(1).sendKeys(Keys.CONTROL + "a" + Keys.BACK_SPACE);
+        pimPage.SearchEmployeeByValidName(employeeName);
+        Thread.sleep(1500);
+
+        //Assertion
+
+        String message_actual = driver.findElements(By.className("oxd-text--span")).get(11).getText();
+        String message_expected = "Record Found";
+        Assert.assertTrue(message_actual.contains(message_expected));
+        Thread.sleep(1000);
+    }
+    @Test(priority = 8, description = "Update user Id by Random Id")
+    public void updateEmployeeById() throws InterruptedException, IOException, ParseException {
+        pimPage = new PIMPage(driver);
+        int empId = Utils.generateRandomNumber(10000, 99999);
+        String randomEmployeeId = String.valueOf(empId);
+        Utils.updateJSONObject("./src/test/resources/Employee.json", "employeeId", randomEmployeeId,0 );
+        Utils.doScroll(driver,300);
+        pimPage.updateEmployeeById(randomEmployeeId);
+        Thread.sleep(1500);
+
+        // Assertion
+        String header_actual = driver.findElements(By.className("orangehrm-main-title")).get(0).getText();
+        String header_expected = "Personal Details";
+        Assert.assertTrue(header_actual.contains(header_expected));
+    }
+    @Test(priority = 9, description = "Search by updated Employee Id")
+    public void searchEmployeeById() throws IOException, ParseException, InterruptedException {
+        loginPage = new LoginPage(driver);
+        dashboardPage = new DashboardPage(driver);
+        dashboardPage.menus.get(1).click();
+        JSONObject userObject = Utils.loadJSONFileContainingArray("./src/test/resources/Employee.json", 0);
+        String employeeId = userObject.get("employeeId").toString();
+        pimPage.SearchEmployeeByValidId(employeeId);
+        Thread.sleep(1500);
+        Utils.doScroll(driver,500);
+
+        //Assertion
+        String message_actual = driver.findElements(By.className("oxd-text--span")).get(11).getText();
+        String message_expected = "Record Found";
+        Assert.assertTrue(message_actual.contains(message_expected));
+        Thread.sleep(1000);
+
+    }
+    @Test(priority = 10,description = "Admin Logout Successfully")
+    public void logOut() {
+        DashboardPage dashboardPage = new DashboardPage(driver);
+        dashboardPage.doLogout();
+        driver.close();
+    }
+}
